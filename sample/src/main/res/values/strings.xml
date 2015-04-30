@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Acacia</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_stop">Stop</string>
+    <string name="status" formatted="false">Player status: %s</string>
+    <string name="track_info">Track info</string>
+    <string name="not_playing">Not playing any song</string>
+    <string name="playing">Currently playing</string>
+</resources>
