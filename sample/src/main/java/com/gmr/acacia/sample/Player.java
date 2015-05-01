@@ -1,12 +1,12 @@
 package com.gmr.acacia.sample;
 
-import com.gmr.acacia.annotations.Service;
+import com.gmr.acacia.Service;
 
 import rx.Observable;
 
 
-@Service(MyPlayerServiceImpl.class)
-public interface MyPlayerService
+@Service(value = PlayerImpl.class, androidService = PlayerService.class)
+public interface Player
 {
 
     void play(String aSongName);

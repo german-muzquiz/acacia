@@ -20,9 +20,6 @@ public class ServiceThread extends Thread
     @Override
     public void run()
     {
-        // many threads may be started for the same service implementation, differentiate them using the id
-        this.setName(this.getName() + "-" + this.getId());
-
         // preparing a looper on current thread
         // the current thread is being detected implicitly
         Looper.prepare();

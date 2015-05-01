@@ -1,61 +1,54 @@
 package com.gmr.acacia;
 
-import android.content.Intent;
-import android.os.Binder;
-import android.os.IBinder;
-import android.util.Log;
 
-import com.gmr.acacia.impl.Constants;
-
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * This is a generic implementation of Android {@link android.app.Service}.
+ * Use this annotation in an interface meant to be a Service:
  *
- * It is a bound service meant to be run locally in the same process as the application, so there's
- * no AIDL handling.
+ * <pre>
+ *     {@literal @Service(ServiceImpl.class) }
+ *     public interface MyService {
+ *
+ *     }
+ * </pre>
+ *
+ * The value attribute is the class implementing the interface.
  */
-public class Service extends android.app.Service
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface Service
 {
+
     /**
-     * Class for clients to access. Because we know this service always
-     * runs in the same process as its clients, we don't need to deal with IPC.
+     * @return class implementing the interface on which this annotation is used (required).
      */
-    public class LocalBinder extends Binder
-    {
-        public Service getService()
-        {
-            return Service.this;
-        }
-    }
+    public Class<?> value();
 
-    // This is the object that receives interactions from clients.
-    private final IBinder binder = new LocalBinder();
+    /**
+     * Specify the Android {@link android.app.Service} class to use for this service. Useful for
+     * having multiple acacia services on the same application, or to have control over the service name
+     * published in AndroidManifest.xml. The class must extend {@link com.gmr.acacia.AcaciaService}.
+     *
+     * @return Android service class, {@link com.gmr.acacia.AcaciaService} by default.
+     */
+    public Class<? extends AcaciaService> androidService() default AcaciaService.class;
 
-    @Override
-    public IBinder onBind(Intent intent)
-    {
-        return binder;
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId)
-    {
-        Log.d(Constants.LOG_TAG, this.getClass().getSimpleName() + ": onStartCommand: " + intent);
-        return START_REDELIVER_INTENT;
-    }
-
-    @Override
-    public void onCreate()
-    {
-        Log.d(Constants.LOG_TAG, "Creating " + this.getClass().getSimpleName());
-        super.onCreate();
-    }
-
-    @Override
-    public void onDestroy()
-    {
-        Log.d(Constants.LOG_TAG, "Destroying " + this.getClass().getSimpleName());
-        super.onDestroy();
-    }
+    /**
+     * Whether or not to use a worker thread on the service.
+     *
+     * When using a worker thread, all methods invoked on the service will be run on a single,
+     * separate thread sequentially.
+     * If the method returns a {@link rx.Observable}, subscriptions are automatically executed
+     * on the worker thread.
+     * If the method return type is not void or {@link rx.Observable}, it is executed on the
+     * calling thread.
+     *
+     * @return true to use a worker thread (default).
+     */
+    public boolean useWorkerThread() default true;
 
 }

@@ -1,57 +1,30 @@
 package com.gmr.acacia.sample;
 
 import android.app.Notification;
-import android.content.Context;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.gmr.acacia.ServiceAware;
-import com.gmr.acacia.ServiceControl;
 
 import rx.Observable;
 import rx.Subscriber;
 import rx.observables.ConnectableObservable;
 
 
-public class MyPlayerServiceImpl implements MyPlayerService, ServiceAware
+public class PlayerImpl implements Player, ServiceAware<PlayerService>
 {
-    private Context context;
-    private ServiceControl serviceControl;
     private SubscribablePlayerState subscribablePlayerState;
     private ConnectableObservable<PlayerState> observablePlayerState;
     private String playingSong;
+    private PlayerService playerService;
 
 
-    public MyPlayerServiceImpl()
+    public PlayerImpl()
     {
         subscribablePlayerState = new SubscribablePlayerState();
         observablePlayerState = Observable.create(subscribablePlayerState).replay(1);
         observablePlayerState.connect();
         subscribablePlayerState.onPlayerStateChanged(PlayerState.stopped);
-    }
-
-    @Override
-    public void setContext(Context context)
-    {
-        this.context = context;
-    }
-
-    @Override
-    public void onServiceConnected(ServiceControl serviceControl)
-    {
-        this.serviceControl = serviceControl;
-    }
-
-    @Override
-    public void onServiceDisconnected()
-    {
-        this.serviceControl = null;
-    }
-
-    @Override
-    public void onInvocationException(Throwable throwable)
-    {
-        Log.e("PlayerService",  "[" + Thread.currentThread().getName() + "] Service exception", throwable);
     }
 
     @Override
@@ -101,26 +74,24 @@ public class MyPlayerServiceImpl implements MyPlayerService, ServiceAware
 
     private void startForeground()
     {
-        if (serviceControl != null)
-        {
-            Notification notification = new NotificationCompat.Builder(context)
-                    .setContentTitle(context.getString(R.string.app_name))
-                    .setContentText(context.getString(R.string.playing))
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .build();
-            serviceControl.startForeground(1, notification);
-        }
+        Notification notification = new NotificationCompat.Builder(playerService)
+                .setContentTitle(playerService.getString(R.string.app_name))
+                .setContentText(playerService.getString(R.string.playing))
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .build();
+        playerService.startForeground(1, notification);
     }
 
     private void stopForeground()
     {
-        if (serviceControl != null)
-        {
-            serviceControl.stopForeground(true);
-        }
+        playerService.stopForeground(true);
     }
 
-
+    @Override
+    public void setAndroidService(PlayerService androidService)
+    {
+        playerService = androidService;
+    }
 
 
     private static class SubscribablePlayerState implements Observable.OnSubscribe<PlayerState>

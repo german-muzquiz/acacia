@@ -6,12 +6,14 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 
 
 public class MainActivity extends ActionBarActivity
 {
+    private Subscription playerSubscription;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -21,24 +23,21 @@ public class MainActivity extends ActionBarActivity
 
         final TextView status = (TextView) findViewById(R.id.status);
 
-        App.getPlayerService().getPlayerState()
+        playerSubscription = App.getPlayer().getPlayerState()
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Action1<PlayerState>()
-                {
+                .subscribe(new Action1<PlayerState>() {
                     @Override
-                    public void call(PlayerState playerState)
-                    {
+                    public void call(PlayerState playerState) {
                         status.setText(getString(R.string.status, playerState.name()));
                     }
                 });
-
 
         findViewById(R.id.play).setOnClickListener(new View.OnClickListener()
         {
             @Override
             public void onClick(View v)
             {
-                App.getPlayerService().play("Cool song");
+                App.getPlayer().play("Cool song");
             }
         });
 
@@ -47,7 +46,7 @@ public class MainActivity extends ActionBarActivity
             @Override
             public void onClick(View v)
             {
-                App.getPlayerService().pause();
+                App.getPlayer().pause();
             }
         });
 
@@ -56,7 +55,7 @@ public class MainActivity extends ActionBarActivity
             @Override
             public void onClick(View v)
             {
-                App.getPlayerService().stop();
+                App.getPlayer().stop();
             }
         });
 
@@ -65,7 +64,7 @@ public class MainActivity extends ActionBarActivity
             @Override
             public void onClick(View v)
             {
-                TrackInfo trackInfo = App.getPlayerService().getTrackInfo();
+                TrackInfo trackInfo = App.getPlayer().getTrackInfo();
 
                 if (trackInfo != null)
                 {
@@ -79,4 +78,14 @@ public class MainActivity extends ActionBarActivity
         });
     }
 
+    @Override
+    protected void onDestroy()
+    {
+        if (playerSubscription != null && !playerSubscription.isUnsubscribed())
+        {
+            playerSubscription.unsubscribe();
+        }
+
+        super.onDestroy();
+    }
 }

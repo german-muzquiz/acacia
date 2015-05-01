@@ -2,22 +2,22 @@ package com.gmr.acacia.sample;
 
 import android.app.Application;
 
-import com.gmr.acacia.AutoService;
+import com.gmr.acacia.Acacia;
 
 
 public class App extends Application
 {
-    private static MyPlayerService playerService;
+    private static Player player;
 
     @Override
     public void onCreate()
     {
         super.onCreate();
-        playerService = AutoService.createService(getApplicationContext(), MyPlayerService.class);
+        player = Acacia.createService(getApplicationContext(), Player.class);
     }
 
-    public static MyPlayerService getPlayerService()
+    public static Player getPlayer()
     {
-        return playerService;
+        return player;
     }
 }

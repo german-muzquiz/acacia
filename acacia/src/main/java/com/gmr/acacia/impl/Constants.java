@@ -9,6 +9,6 @@ public abstract class Constants
 
     private Constants() { /* no instances allowed */ }
 
-    public static final String LOG_TAG = "AutoService";
+    public static final String LOG_TAG = "Acacia";
 
 }

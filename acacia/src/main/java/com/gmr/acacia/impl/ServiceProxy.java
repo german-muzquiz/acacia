@@ -1,145 +1,208 @@
 package com.gmr.acacia.impl;
 
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
 import android.util.Log;
 
-import com.gmr.acacia.AutoServiceException;
-import com.gmr.acacia.annotations.Service;
+import com.gmr.acacia.AcaciaException;
+import com.gmr.acacia.AcaciaService;
+import com.gmr.acacia.Service;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import rx.Observable;
-import rx.android.schedulers.AndroidSchedulers;
+import rx.Subscriber;
 
 
 /**
  * Java dynamic proxy to a user defined implementation of a service.
  */
-public class ServiceProxy implements InvocationHandler
+public class ServiceProxy implements InvocationHandler, ServiceConnection
 {
-    private ServiceControlImpl serviceControl;
+    private AcaciaService service;
+    private boolean useWorkerThread;
+    private Class<?> userImplClass;
+    // keep track of service invocations made before the service connection is established
+    private Queue<PendingInvocation> pendingInvocations;
 
 
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(Context aContext, Class<T> aServiceInterface)
     {
-        try
+        // Validate annotations
+        Service serviceAnnotation = aServiceInterface.getAnnotation(Service.class);
+        if (serviceAnnotation == null)
         {
-            // Validate annotations
-            Service serviceAnnotation = aServiceInterface.getAnnotation(Service.class);
-            if (serviceAnnotation == null)
-            {
-                throw new AutoServiceException("Interface " + aServiceInterface.getName() + " must be annotated " +
-                        "with " + Service.class.getName() + " to create a service.");
-            }
-
-            boolean useWorkerThread = serviceAnnotation.useWorkerThread();
-            Class<?> implementation = serviceAnnotation.value();
-
-            // Create instance of user defined service implementation
-            Object serviceImpl = implementation.newInstance();
-
-            return (T) Proxy.newProxyInstance(aServiceInterface.getClassLoader(),
-                    new Class[]{aServiceInterface},
-                    new ServiceProxy(aContext, serviceImpl, useWorkerThread));
+            throw new AcaciaException("Interface " + aServiceInterface.getName() + " must be annotated " +
+                    "with " + Service.class.getName() + " to create a service.");
         }
-        catch (InstantiationException | IllegalAccessException anEx)
+        if (!aServiceInterface.isAssignableFrom(serviceAnnotation.value()))
         {
-            throw new AutoServiceException("Cannot instantiate " + aServiceInterface.getAnnotation(
-                    Service.class).value().getName() + ". Does it" +
-                    " have an empty default constructor?", anEx);
+            throw new AcaciaException("Class " + serviceAnnotation.value().getName() + " must implement " +
+                    aServiceInterface.getName());
         }
+
+        return (T) Proxy.newProxyInstance(aServiceInterface.getClassLoader(),
+                new Class[]{aServiceInterface},
+                new ServiceProxy(aContext, aServiceInterface));
     }
 
 
-    public ServiceProxy(Context aContext, Object aServiceImpl, boolean useWorkerThread)
+    public ServiceProxy(Context aContext, Class<?> aServiceInterface)
     {
-        serviceControl = new ServiceControlImpl(aContext, aServiceImpl, useWorkerThread);
+        this.pendingInvocations = new LinkedList<>();
+
+        Service serviceAnnotation = aServiceInterface.getAnnotation(Service.class);
+        this.useWorkerThread = serviceAnnotation.useWorkerThread();
+        this.userImplClass = serviceAnnotation.value();
+        Class<? extends AcaciaService> androidService = serviceAnnotation.androidService();
+
+        // Start Android service
+        Intent intent = new Intent(aContext, androidService);
+        aContext.startService(intent);
+        aContext.bindService(intent, this, Context.BIND_AUTO_CREATE);
     }
 
 
     @Override
-    public Object invoke(Object proxy, Method invokedMethod, Object[] args)
+    public void onServiceConnected(ComponentName name, IBinder iBinder)
     {
-        try
+        Log.d(Constants.LOG_TAG, "Service connected.");
+        service = ((AcaciaService.LocalBinder) iBinder).getService();
+        service.setUserImplClass(userImplClass);
+        if (useWorkerThread)
         {
-            if (!serviceControl.isUsingWorkerThread())
-            {
-                return handleDirectInvocation(invokedMethod, args);
-            }
-            else if (invokedMethod.getReturnType().equals(Void.TYPE))
-            {
-                handleVoidOnWorkerThread(invokedMethod, args);
-                return null;
-            }
-            else if (invokedMethod.getReturnType().equals(Observable.class))
-            {
-                return handleObservableOnWorkerThread(invokedMethod, args);
-            }
-            else
-            {
-                return handleDirectInvocation(invokedMethod, args);
-            }
+            service.startServiceThread();
         }
-        catch (Throwable anError)
+
+        // execute pending invocations
+        PendingInvocation pendingInvocation;
+        while ((pendingInvocation = pendingInvocations.poll()) != null)
         {
-            handleError(anError, invokedMethod, args);
+            pendingInvocation.setService(service);
+            pendingInvocation.run();
+        }
+    }
+
+
+    @Override
+    public void onServiceDisconnected(ComponentName name)
+    {
+        Log.d(Constants.LOG_TAG, "Service disconnected.");
+        service = null;
+    }
+    
+
+    @Override
+    public Object invoke(Object proxy, Method invokedMethod, Object[] args) throws Throwable
+    {
+        if (service == null)
+        {
+            return handleDisconnectedInvocation(invokedMethod, args);
+        }
+        else
+        {
+            return handleConnectedInvocation(invokedMethod, args);
+        }
+    }
+
+
+    private Object handleDisconnectedInvocation(final Method invokedMethod, final Object[] args) throws Throwable
+    {
+        final PendingInvocation pendingInvocation = new PendingInvocation(invokedMethod, args);
+        pendingInvocations.add(pendingInvocation);
+
+        if (invokedMethod.getReturnType().equals(Void.TYPE))
+        {
+            return null;
+        }
+        else if (invokedMethod.getReturnType().equals(Observable.class))
+        {
+            return Observable.merge(Observable.create(pendingInvocation));
+        }
+        else
+        {
+            Log.w(Constants.LOG_TAG, "Failed to deliver result of " + invokedMethod + ", service is" +
+                    " not connected yet.");
             return null;
         }
     }
 
 
-    /**
-     * Invoke user service implementation directly on the client calling thread.
-     */
-    private Object handleDirectInvocation(final Method invokedMethod, final Object[] args) throws Throwable
+    private Object handleConnectedInvocation(Method invokedMethod, Object[] args) throws Throwable
     {
-        return invokedMethod.invoke(serviceControl.getServiceImplementation(), args);
+        return service.invoke(invokedMethod, args);
     }
 
 
-    /**
-     * Post invocation of user service implementation to worker thread queue.
-     */
-    private void handleVoidOnWorkerThread(final Method invokedMethod, final Object[] args) throws Throwable
+    private static class PendingInvocation implements Runnable, Observable.OnSubscribe<Observable<?>>
     {
-        serviceControl.getServiceThread().getHandler().post(new Runnable()
+        private Method invokedMethod;
+        private Object[] args;
+        private AcaciaService service;
+        private Subscriber<? super Observable<?>> subscriber;
+
+
+        private PendingInvocation(Method invokedMethod, Object[] args)
         {
-            @Override
-            public void run()
+            this.invokedMethod = invokedMethod;
+            this.args = args;
+        }
+
+        public void setService(AcaciaService service)
+        {
+            this.service = service;
+        }
+
+        @Override
+        public void run()
+        {
+            try
             {
-                try
+                Object result = this.service.invoke(invokedMethod, args);
+                if (invokedMethod.getReturnType().equals(Observable.class))
                 {
-                    invokedMethod.invoke(serviceControl.getServiceImplementation(), args);
+                    Observable<?> resultObservable = (Observable<?>) result;
+                    if (subscriber != null)
+                    {
+                        subscriber.onNext(resultObservable);
+                        subscriber.onCompleted();
+                    }
                 }
-                catch (Throwable anError)
+                else
                 {
-                    handleError(anError, invokedMethod, args);
+                    Log.w(Constants.LOG_TAG, "Ignoring result of " + invokedMethod + ", as it was" +
+                            " called when the service was not connected yet.");
                 }
             }
-        });
-    }
+            catch (Throwable throwable)
+            {
+                if (invokedMethod.getReturnType().equals(Observable.class))
+                {
+                    if (subscriber != null)
+                    {
+                        subscriber.onError(throwable);
+                    }
+                }
+                else
+                {
+                    Log.e(Constants.LOG_TAG, "Ignoring exception while executing " + invokedMethod
+                            + ", as it was called when the service was not connected yet.", throwable);
+                }
+            }
+        }
 
-
-    /**
-     * Subscribe observable invocation to the worker thread queue.
-     */
-    private Observable<?> handleObservableOnWorkerThread(final Method invokedMethod, final Object[] args) throws Throwable
-    {
-        Observable<?> result = (Observable<?>) invokedMethod.invoke(serviceControl.getServiceImplementation(), args);
-        return result.subscribeOn(AndroidSchedulers.handlerThread(serviceControl.getServiceThread().getHandler()));
-    }
-
-
-    private void handleError(Throwable anError, Method invokedMethod, Object[] args)
-    {
-        if (!serviceControl.reportInvocationException(anError))
+        @Override
+        public void call(Subscriber<? super Observable<?>> subscriber)
         {
-            Log.e(Constants.LOG_TAG, "Exception executing method " + invokedMethod +
-                    " with arguments " + Arrays.toString(args), anError);
+            this.subscriber = subscriber;
         }
     }
 
