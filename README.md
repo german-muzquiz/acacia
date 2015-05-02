@@ -10,8 +10,18 @@ Download the jar file and add it to your libs folder:
 
 [ ![Download](https://api.bintray.com/packages/germnix/maven/Acacia/images/download.svg) ](https://bintray.com/germnix/maven/Acacia/_latestVersion)
 
-Jcenter support coming soon!
+Or add the dependency to build.gradle:
 
+        compile 'com.gmr:acacia:0.1.0'
+
+Or pom.xml:
+
+        <dependency>
+            <groupId>com.gmr</groupId>
+            <artifactId>acacia</artifactId>
+            <version>0.1.0</version>
+            <type>jar</type>
+        </dependency>
 
 ##Simple use
 1. Define an interface annotated with `@Service`:
