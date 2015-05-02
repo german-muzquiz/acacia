@@ -23,7 +23,7 @@ import com.gmr.acacia.impl.ServiceProxy;
           {@literal <application }
                android:icon="@mipmap/ic_launcher"
                android:label="@string/app_name"
-               android:theme="@style/AppTheme">
+               {@literal android:theme="@style/AppTheme">}
                ...
                {@literal <service android:name="com.gmr.acacia.AcaciaService"/>}
                ...
@@ -32,7 +32,7 @@ import com.gmr.acacia.impl.ServiceProxy;
        3. (Optional) Implement ServiceAware in your service implementation in order to receive
           the Android Service object and show/hide: a persistent notification:
 
-          public class ServiceImpl implements MyService, ServiceAware<AcaciaService> {
+          public class ServiceImpl implements MyService, ServiceAware{@literal <AcaciaService>} {
                 ...
                 {@literal @Override}
                 public void setAndroidService(AcaciaService androidService) {
@@ -53,7 +53,7 @@ import com.gmr.acacia.impl.ServiceProxy;
           {@literal <application }
               android:icon="@mipmap/ic_launcher"
               android:label="@string/app_name"
-              android:theme="@style/AppTheme">
+              {@literal android:theme="@style/AppTheme">}
               ...
               {@literal <service android:name=".AndroidService"/>}
               ...

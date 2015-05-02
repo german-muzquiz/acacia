@@ -4,6 +4,15 @@ its implementing class. All the wiring around bound services, service connection
 automatically handled. Also having the service implementation and the actual Android Service instance
 as separate classes, allows them to be easily tested.
 
+##Installation
+
+Download the jar file and add it to your libs folder:
+
+[ ![Download](https://api.bintray.com/packages/germnix/maven/Acacia/images/download.svg) ](https://bintray.com/germnix/maven/Acacia/_latestVersion)
+
+Jcenter support coming soon!
+
+
 ##Simple use
 1. Define an interface annotated with `@Service`:
 
