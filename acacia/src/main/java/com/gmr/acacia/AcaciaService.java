@@ -195,7 +195,14 @@ public class AcaciaService extends Service
     private Observable<?> handleObservableOnWorkerThread(final Method invokedMethod, final Object[] args) throws Throwable
     {
         Observable<?> result = (Observable<?>) invokedMethod.invoke(userImpl, args);
-        return result.subscribeOn(AndroidSchedulers.handlerThread(serviceThread.getHandler()));
+        if (result != null)
+        {
+            return result.subscribeOn(AndroidSchedulers.handlerThread(serviceThread.getHandler()));
+        }
+        else
+        {
+            return null;
+        }
     }
 
 
@@ -211,4 +218,18 @@ public class AcaciaService extends Service
         stopSelf();
     }
 
+
+    /**
+     * Only used for tests.
+     * @param aUserImpl to use as service implementation.
+     */
+    void setUserImpl(Object aUserImpl)
+    {
+        this.userImpl = aUserImpl;
+    }
+
+    ServiceThread getServiceThread()
+    {
+        return serviceThread;
+    }
 }

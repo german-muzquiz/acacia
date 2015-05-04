@@ -21,6 +21,10 @@ configurations {
 dependencies {
     compile 'io.reactivex:rxandroid:0.23.0'
     provided 'com.google.android:android:4.1.1.4'
+    testCompile 'junit:junit:4.11'
+    testCompile 'org.mockito:mockito-all:1.9.5'
+    testCompile 'org.robolectric:robolectric:2.4'
+    testCompile fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 def siteUrl = 'https://github.com/germnix/acacia'      // Homepage URL of the library
