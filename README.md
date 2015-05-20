@@ -4,6 +4,8 @@ its implementing class. All the wiring around bound services, service connection
 automatically handled. Also having the service implementation and the actual Android Service instance
 as separate classes, allows them to be easily tested.
 
+[![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Acacia-brightgreen.svg?style=flat)](http://android-arsenal.com/details/1/1837)
+
 ##Installation
 
 Download the jar file and add it to your libs folder:
