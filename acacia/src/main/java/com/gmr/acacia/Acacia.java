@@ -1,8 +1,13 @@
 package com.gmr.acacia;
 
 import android.content.Context;
+import android.util.Log;
 
+import com.gmr.acacia.impl.Constants;
+import com.gmr.acacia.impl.ServiceControl;
 import com.gmr.acacia.impl.ServiceProxy;
+
+import java.lang.reflect.Method;
 
 
 /**
@@ -78,6 +83,38 @@ public class Acacia
     public static <T> T createService(Context aContext, Class<T> aServiceInterface)
     {
         return ServiceProxy.newInstance(aContext, aServiceInterface);
+    }
+
+    /**
+     * Stop a previously created service. After this method is called, all further interactions with
+     * the service object will throw {@link java.lang.IllegalStateException}.
+     *
+     * @param aService instance to be stopped.
+     */
+    public static void stopService(Object aService)
+    {
+        for (Class<?> myInterface : aService.getClass().getInterfaces())
+        {
+            Service serviceAnnotation = myInterface.getAnnotation(Service.class);
+            if (serviceAnnotation != null)
+            {
+                try
+                {
+                    Method stopMethod = ServiceControl.class.getDeclaredMethod("stop");
+                    stopMethod.invoke(aService);
+                }
+                catch (Exception anEx)
+                {
+                    Log.e(Constants.LOG_TAG, "Unable to stop service", anEx);
+                }
+
+                return;
+            }
+        }
+
+        throw new AcaciaException("Given class " + aService.getClass().getName() +
+                " is not a service interface (must be annotated " +
+                "with " + Service.class.getName() + ")");
     }
 
 }

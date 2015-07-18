@@ -2,7 +2,9 @@ package com.gmr.acacia;
 
 
 import android.content.ComponentName;
+import android.content.ServiceConnection;
 
+import com.gmr.acacia.impl.ServiceProxy;
 import com.gmr.acacia.test.TestServiceImpl;
 import com.gmr.acacia.test.TestServiceOnCallerThread;
 import com.gmr.acacia.test.TestServiceOnWorkerThread;
@@ -20,6 +22,7 @@ import rx.functions.Action1;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.robolectric.Robolectric.shadowOf;
 
@@ -142,6 +145,23 @@ public class AcaciaTest
 
         assertEquals(77, serviceInterface.getIntPrimitive());
         assertNull(androidService.getServiceThread());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testStopService() throws InterruptedException
+    {
+        TestServiceOnWorkerThread serviceInterface = Acacia.createService(
+                Robolectric.application, TestServiceOnWorkerThread.class);
+
+        Acacia.stopService(serviceInterface);
+
+        assertTrue(shadowOf(androidService).isStoppedBySelf());
+
+        Class<? extends ServiceConnection> unboundConn = shadowOf(Robolectric.application).
+                getUnboundServiceConnections().get(0).getClass();
+        assertEquals(ServiceProxy.class, unboundConn);
+
+        serviceInterface.getIntPrimitive();
     }
 
 

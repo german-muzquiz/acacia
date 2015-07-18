@@ -14,11 +14,9 @@ import com.gmr.acacia.Service;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
-
-import rx.Observable;
-import rx.Subscriber;
 
 
 /**
@@ -31,6 +29,8 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
     private Class<?> userImplClass;
     // keep track of service invocations made before the service connection is established
     private Queue<PendingInvocation> pendingInvocations;
+    private Context context;
+    private boolean isServiceStopped;
 
 
     @SuppressWarnings("unchecked")
@@ -50,7 +50,7 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
         }
 
         return (T) Proxy.newProxyInstance(aServiceInterface.getClassLoader(),
-                new Class[]{aServiceInterface},
+                new Class[]{aServiceInterface, ServiceControl.class},
                 new ServiceProxy(aContext, aServiceInterface));
     }
 
@@ -58,6 +58,8 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
     public ServiceProxy(Context aContext, Class<?> aServiceInterface)
     {
         this.pendingInvocations = new LinkedList<>();
+        this.context = aContext;
+        this.isServiceStopped = false;
 
         Service serviceAnnotation = aServiceInterface.getAnnotation(Service.class);
         this.useWorkerThread = serviceAnnotation.useWorkerThread();
@@ -103,7 +105,17 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
     @Override
     public Object invoke(Object proxy, Method invokedMethod, Object[] args) throws Throwable
     {
-        if (service == null)
+        if (isServiceStopped)
+        {
+            throw new IllegalStateException("Service has been stopped, you must create a new instance.");
+        }
+
+        // Handle ServiceControl invocations
+        if (Arrays.asList(ServiceControl.class.getDeclaredMethods()).contains(invokedMethod))
+        {
+            return handleServiceControlInvocation(invokedMethod);
+        }
+        else if (service == null)
         {
             return handleDisconnectedInvocation(invokedMethod, args);
         }
@@ -114,96 +126,39 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
     }
 
 
-    private Object handleDisconnectedInvocation(final Method invokedMethod, final Object[] args) throws Throwable
+    private Object handleServiceControlInvocation(Method invokedMethod)
     {
-        final PendingInvocation pendingInvocation = new PendingInvocation(invokedMethod, args);
-        pendingInvocations.add(pendingInvocation);
+        if (invokedMethod.getName().equals("stop"))
+        {
+            isServiceStopped = true;
 
-        if (invokedMethod.getReturnType().equals(Void.TYPE))
-        {
-            return null;
-        }
-        else if (invokedMethod.getReturnType().equals(Observable.class))
-        {
-            return Observable.merge(Observable.create(pendingInvocation));
+            if (service != null)
+            {
+                service.stop();
+            }
+
+            context.unbindService(this);
         }
         else
         {
-            Log.w(Constants.LOG_TAG, "Failed to deliver result of " + invokedMethod + ", service is" +
-                    " not connected yet.");
-            return null;
+            Log.w(Constants.LOG_TAG, "Unhandled ServiceControl method " + invokedMethod);
         }
+
+        return null;
+    }
+
+
+    private Object handleDisconnectedInvocation(final Method invokedMethod, final Object[] args) throws Throwable
+    {
+        final PendingInvocation pendingInvocation = PendingInvocationFactory.newInstance(invokedMethod, args);
+        pendingInvocations.add(pendingInvocation);
+        return pendingInvocation.returnOnDisconnectedInvocation();
     }
 
 
     private Object handleConnectedInvocation(Method invokedMethod, Object[] args) throws Throwable
     {
         return service.invoke(invokedMethod, args);
-    }
-
-
-    private static class PendingInvocation implements Runnable, Observable.OnSubscribe<Observable<?>>
-    {
-        private Method invokedMethod;
-        private Object[] args;
-        private AcaciaService service;
-        private Subscriber<? super Observable<?>> subscriber;
-
-
-        private PendingInvocation(Method invokedMethod, Object[] args)
-        {
-            this.invokedMethod = invokedMethod;
-            this.args = args;
-        }
-
-        public void setService(AcaciaService service)
-        {
-            this.service = service;
-        }
-
-        @Override
-        public void run()
-        {
-            try
-            {
-                Object result = this.service.invoke(invokedMethod, args);
-                if (invokedMethod.getReturnType().equals(Observable.class))
-                {
-                    Observable<?> resultObservable = (Observable<?>) result;
-                    if (subscriber != null)
-                    {
-                        subscriber.onNext(resultObservable);
-                        subscriber.onCompleted();
-                    }
-                }
-                else
-                {
-                    Log.w(Constants.LOG_TAG, "Ignoring result of " + invokedMethod + ", as it was" +
-                            " called when the service was not connected yet.");
-                }
-            }
-            catch (Throwable throwable)
-            {
-                if (invokedMethod.getReturnType().equals(Observable.class))
-                {
-                    if (subscriber != null)
-                    {
-                        subscriber.onError(throwable);
-                    }
-                }
-                else
-                {
-                    Log.e(Constants.LOG_TAG, "Ignoring exception while executing " + invokedMethod
-                            + ", as it was called when the service was not connected yet.", throwable);
-                }
-            }
-        }
-
-        @Override
-        public void call(Subscriber<? super Observable<?>> subscriber)
-        {
-            this.subscriber = subscriber;
-        }
     }
 
 }
