@@ -4,7 +4,7 @@ apply plugin: 'com.jfrog.bintray'
 
 
 group = 'com.gmr'
-version = '0.1.0'
+version = '0.1.1'
 
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
@@ -19,7 +19,7 @@ configurations {
 }
 
 dependencies {
-    compile 'io.reactivex:rxandroid:0.23.0'
+    provided 'io.reactivex:rxandroid:0.23.0'
     provided 'com.google.android:android:4.1.1.4'
     testCompile 'junit:junit:4.11'
     testCompile 'org.mockito:mockito-all:1.9.5'
