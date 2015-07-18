@@ -4,6 +4,8 @@ its implementing class. All the wiring around bound services, service connection
 automatically handled. Also having the service implementation and the actual Android Service instance
 as separate classes, allows them to be easily tested.
 
+[![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Acacia-brightgreen.svg?style=flat)](http://android-arsenal.com/details/1/1837)
+
 ##Installation
 
 Download the jar file and add it to your libs folder:
@@ -12,16 +14,18 @@ Download the jar file and add it to your libs folder:
 
 Or add the dependency to build.gradle:
 
-        compile 'com.gmr:acacia:0.1.0'
+        compile 'com.gmr:acacia:0.1.1'
 
 Or pom.xml:
 
         <dependency>
             <groupId>com.gmr</groupId>
             <artifactId>acacia</artifactId>
-            <version>0.1.0</version>
+            <version>0.1.1</version>
             <type>jar</type>
         </dependency>
+
+Acacia doesn't have runtime dependencies other than Android itself and the project it is being used on.
 
 ##Simple use
 1. Define an interface annotated with `@Service`:
