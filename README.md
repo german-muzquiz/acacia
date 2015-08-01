@@ -14,14 +14,14 @@ Download the jar file and add it to your libs folder:
 
 Or add the dependency to build.gradle:
 
-        compile 'com.gmr:acacia:0.1.1'
+        compile 'com.gmr:acacia:0.1.2'
 
 Or pom.xml:
 
         <dependency>
             <groupId>com.gmr</groupId>
             <artifactId>acacia</artifactId>
-            <version>0.1.1</version>
+            <version>0.1.2</version>
             <type>jar</type>
         </dependency>
 
