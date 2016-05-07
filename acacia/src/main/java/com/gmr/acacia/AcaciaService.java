@@ -5,14 +5,12 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
-
+import com.gmr.acacia.impl.AcaciaFactory;
 import com.gmr.acacia.impl.Constants;
+import com.gmr.acacia.impl.ServiceExecutor;
 import com.gmr.acacia.impl.ServiceThread;
 
 import java.lang.reflect.Method;
-
-import rx.Observable;
-import rx.android.schedulers.AndroidSchedulers;
 
 
 /**
@@ -24,8 +22,8 @@ import rx.android.schedulers.AndroidSchedulers;
  */
 public class AcaciaService extends Service
 {
-    private ServiceThread serviceThread;
-    private Object userImpl;
+    private ServiceExecutor serviceExecutor;
+
 
     /**
      * Class for clients to access. Because we know this service always
@@ -79,10 +77,12 @@ public class AcaciaService extends Service
     @SuppressWarnings("unchecked")
     public final void setUserImplClass(Class<?> aClass) throws AcaciaException
     {
-        if (userImpl != null) { return; }
+        if (serviceExecutor != null) { return; }
 
         try
         {
+            Object userImpl;
+
             if (aClass.isInstance(this))
             {
                 // User service implementation is a subclass of AcaciaService, so "this"
@@ -93,6 +93,8 @@ public class AcaciaService extends Service
                 // implementation is some other class
                 userImpl = aClass.newInstance();
             }
+
+            serviceExecutor = AcaciaFactory.newServiceExecutor(userImpl);
 
             if (userImpl instanceof ServiceAware)
             {
@@ -113,14 +115,7 @@ public class AcaciaService extends Service
      */
     public final void startServiceThread()
     {
-        if (serviceThread != null)
-        {
-            return;
-        }
-
-        String threadName = userImpl.getClass().getSimpleName() + "Thread";
-        serviceThread = new ServiceThread(threadName);
-        serviceThread.start();
+        serviceExecutor.startServiceThread();
     }
 
 
@@ -135,74 +130,7 @@ public class AcaciaService extends Service
      */
     public final Object invoke(Method invokedMethod, Object[] args) throws Throwable
     {
-        if (serviceThread == null)
-        {
-            return handleDirectInvocation(invokedMethod, args);
-        }
-        else if (invokedMethod.getReturnType().equals(Void.TYPE))
-        {
-            handleVoidOnWorkerThread(invokedMethod, args);
-            return null;
-        }
-        else if (invokedMethod.getReturnType().equals(Observable.class))
-        {
-            return handleObservableOnWorkerThread(invokedMethod, args);
-        }
-        else
-        {
-            // method has a return type other than Observable, it cannot be executed on the worker thread
-            return handleDirectInvocation(invokedMethod, args);
-        }
-    }
-
-
-    /**
-     * Invoke user service implementation directly on the client calling thread.
-     */
-    private Object handleDirectInvocation(final Method invokedMethod, final Object[] args) throws Throwable
-    {
-        return invokedMethod.invoke(userImpl, args);
-    }
-
-
-    /**
-     * Post invocation of user service implementation to worker thread queue.
-     */
-    private void handleVoidOnWorkerThread(final Method invokedMethod, final Object[] args) throws Throwable
-    {
-        serviceThread.getHandler().post(new Runnable()
-        {
-            @Override
-            public void run()
-            {
-                try
-                {
-                    invokedMethod.invoke(userImpl, args);
-                }
-                catch (Throwable anError)
-                {
-                    Log.e(Constants.LOG_TAG, "Ignoring exception while executing " + invokedMethod
-                            + " on the worker thread.", anError);
-                }
-            }
-        });
-    }
-
-
-    /**
-     * Subscribe observable invocation to the worker thread queue.
-     */
-    private Observable<?> handleObservableOnWorkerThread(final Method invokedMethod, final Object[] args) throws Throwable
-    {
-        Observable<?> result = (Observable<?>) invokedMethod.invoke(userImpl, args);
-        if (result != null)
-        {
-            return result.subscribeOn(AndroidSchedulers.handlerThread(serviceThread.getHandler()));
-        }
-        else
-        {
-            return null;
-        }
+        return serviceExecutor.invoke(invokedMethod, args);
     }
 
 
@@ -211,10 +139,6 @@ public class AcaciaService extends Service
      */
     public void stop()
     {
-        if (serviceThread != null)
-        {
-            serviceThread.quit();
-        }
         stopSelf();
     }
 
@@ -225,11 +149,11 @@ public class AcaciaService extends Service
      */
     void setUserImpl(Object aUserImpl)
     {
-        this.userImpl = aUserImpl;
+        serviceExecutor = AcaciaFactory.newServiceExecutor(aUserImpl);
     }
 
     ServiceThread getServiceThread()
     {
-        return serviceThread;
+        return serviceExecutor.getServiceThread();
     }
 }

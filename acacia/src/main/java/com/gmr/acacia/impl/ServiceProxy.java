@@ -150,7 +150,7 @@ public class ServiceProxy implements InvocationHandler, ServiceConnection
 
     private Object handleDisconnectedInvocation(final Method invokedMethod, final Object[] args) throws Throwable
     {
-        final PendingInvocation pendingInvocation = PendingInvocationFactory.newInstance(invokedMethod, args);
+        final PendingInvocation pendingInvocation = AcaciaFactory.newPendingInvocation(invokedMethod, args);
         pendingInvocations.add(pendingInvocation);
         return pendingInvocation.returnOnDisconnectedInvocation();
     }

@@ -8,14 +8,14 @@ import com.gmr.acacia.AcaciaService;
 import java.lang.reflect.Method;
 
 
-public class DefaultPendingInvocation implements PendingInvocation
+class DefaultPendingInvocation implements PendingInvocation
 {
     private Method invokedMethod;
     private Object[] args;
     private AcaciaService service;
 
 
-    public DefaultPendingInvocation(Method invokedMethod, Object[] args)
+    DefaultPendingInvocation(Method invokedMethod, Object[] args)
     {
         this.invokedMethod = invokedMethod;
         this.args = args;
